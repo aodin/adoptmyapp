@@ -41,9 +41,46 @@ type User struct {
 	Id        int64  `json:"id"`
 	HtmlURL   string `json:"html_url"`
 	AvatarURL string `json:"avatar_url"`
+	// TODO Other fields
 }
 
 // TODO Get additional collaborators, commits, etc...
+
+// Normalize GitHub URL
+// * Convert the Scheme to HTTPS
+// * Normalize the Host to github.com
+// * Remove any extraneous information at the end of the url
+// This normalized URL will be used to check uniqueness in the database
+func NormalizeGitHubURL(rawurl string) (*url.URL, error) {
+	// Is it even a URL?
+	parsed, err := url.Parse(rawurl)
+	if err != nil {
+		return nil, err
+	}
+
+	// Normalize the host
+	if !(parsed.Host == `www.github.com` || parsed.Host == `github.com`) {
+		return nil, fmt.Errorf("%s does not appear to be a GitHub URL", rawurl)
+	}
+	parsed.Host = `github.com`
+
+	// Normalize the scheme to HTTPS
+	parsed.Scheme = `https`
+
+	// Split the Path apart
+	// There should be a blank part, a user, and a repo
+	parts := strings.Split(parsed.Path, "/")
+	if len(parts) < 3 {
+		return nil, fmt.Errorf("%s must point to a repository", rawurl)
+	}
+	parsed.Path = strings.Join([]string{"", parts[1], parts[2]}, "/")
+
+	// Clear any extraneous query or fragments from the URL
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+
+	return parsed, nil
+}
 
 // Convert the given repository URL into an API URL
 // https://github.com/kkochis/adoptmyapp
@@ -51,28 +88,18 @@ type User struct {
 // https://api.github.com/repos/kkochis/adoptmyapp
 // TODO Error checking, what if a github.com URL was not given
 func ConvertRepoURL(rawurl string) (string, error) {
-	parsed, err := url.Parse(rawurl)
+	parsed, err := NormalizeGitHubURL(rawurl)
 	if err != nil {
 		return "", err
 	}
 
 	// Replace the host with the GitHub API Host
-	if !(parsed.Host == `www.github.com` || parsed.Host == `github.com`) {
-		return "", fmt.Errorf("%s does not appear to be a GitHub URL", rawurl)
-	}
 	parsed.Host = `api.github.com`
 
-	// Confirm HTTPS
-	parsed.Scheme = "https"
-
-	// Split the Path apart
+	// Add repos to the path
 	parts := strings.Split(parsed.Path, "/")
-	if len(parts) < 3 {
-		return "", fmt.Errorf("%s must point to a repository", rawurl)
-	}
-	// There should be a blank part, a user, and a repo
-	// Ignore any additional parts
 	parsed.Path = strings.Join([]string{"", "repos", parts[1], parts[2]}, "/")
+
 	return parsed.String(), nil
 }
 
