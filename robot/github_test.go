@@ -49,22 +49,27 @@ func TestNormalizeGitHubURL(t *testing.T) {
 		}
 	}
 
-	// TODO URLs like:
+	// TODO Error on URLs that are not repositories (blacklist parts?):
 	// https://github.com/blog/1778-webhooks-level-up
-	// git@github.com:kkochis/adoptmyapp.git
-	// https://github.com/kkochis/adoptmyapp.git
-	// github.com/kkochis/adoptmyapp
 
 	// URLs that should be parsed successfully
-	corrects := []string{
+	valids := []string{
 		`https://github.com/kkochis/adoptmyapp`,
 		`http://github.com/kkochis/adoptmyapp`,
 		`https://github.com/kkochis/adoptmyapp/branches`,
 		`https://github.com/kkochis/adoptmyapp/commit/4cbeeab7a83b9e1a92faecf0c8b544a36e7c695a`,
+		`https://github.com/kkochis/adoptmyapp.git`,
+		`github.com/kkochis/adoptmyapp.git`,
+		`github.com/kkochis/adoptmyapp`,
+		`www.github.com/kkochis/adoptmyapp`,
+
+		// Even SSH links are valid
+		`git@github.com:kkochis/adoptmyapp.git`,
+		`git@github.com:kkochis/adoptmyapp`,
 	}
 	exp := `https://github.com/kkochis/adoptmyapp`
 
-	for _, raw := range corrects {
+	for _, raw := range valids {
 		u, err := NormalizeGitHubURL(raw)
 		if err != nil {
 			t.Error(err)

@@ -52,16 +52,22 @@ type User struct {
 // * Remove any extraneous information at the end of the url
 // This normalized URL will be used to check uniqueness in the database
 func NormalizeGitHubURL(rawurl string) (*url.URL, error) {
+	// SSH links are valid
+	if strings.HasPrefix(rawurl, `git@github.com:`) {
+		return NormalizeGitHubSSH(rawurl)
+	}
+
 	// Is it even a URL?
 	parsed, err := url.Parse(rawurl)
 	if err != nil {
 		return nil, err
 	}
 
-	// Normalize the host
-	if !(parsed.Host == `www.github.com` || parsed.Host == `github.com`) {
+	// Either the first part of the path or the host must be github
+	if !(parsed.Host == `www.github.com` || parsed.Host == `github.com` || strings.HasPrefix(parsed.Path, `www.github.com`) || strings.HasPrefix(parsed.Path, `github.com`)) {
 		return nil, fmt.Errorf("%s does not appear to be a GitHub URL", rawurl)
 	}
+	// Normalize the host
 	parsed.Host = `github.com`
 
 	// Normalize the scheme to HTTPS
@@ -73,12 +79,40 @@ func NormalizeGitHubURL(rawurl string) (*url.URL, error) {
 	if len(parts) < 3 {
 		return nil, fmt.Errorf("%s must point to a repository", rawurl)
 	}
-	parsed.Path = strings.Join([]string{"", parts[1], parts[2]}, "/")
+
+	// Remove any .git suffix from the repository part
+	var repo = parts[2]
+	if strings.HasSuffix(repo, `.git`) {
+		repo = repo[:len(repo)-4]
+	}
+
+	parsed.Path = strings.Join([]string{"", parts[1], repo}, "/")
 
 	// Clear any extraneous query or fragments from the URL
 	parsed.RawQuery = ""
 	parsed.Fragment = ""
 
+	return parsed, nil
+}
+
+// Convert a GitHub SSH link into a URL
+func NormalizeGitHubSSH(rawssh string) (*url.URL, error) {
+	parts := strings.Split(rawssh[15:], "/")
+	if len(parts) < 2 {
+		return nil, fmt.Errorf("%s does not appear to be a repository", rawssh)
+	}
+
+	var repo = parts[1]
+	if strings.HasSuffix(repo, `.git`) {
+		repo = repo[:len(repo)-4]
+	}
+
+	// Recreate a URL from this information
+	parsed := &url.URL{
+		Scheme: `https`,
+		Host:   `github.com`,
+		Path:   strings.Join([]string{"", parts[0], repo}, "/"),
+	}
 	return parsed, nil
 }
 
