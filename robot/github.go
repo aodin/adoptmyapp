@@ -13,6 +13,7 @@ import (
 // curl -i https://api.github.com/repos/kkochis/adoptmyapp
 // TODO Are owners always Users?
 type Repository struct {
+	URL         string    `json:"url"` // Normalized URL
 	Id          int64     `json:"id"`
 	Name        string    `json:"name"`
 	FullName    string    `json:"full_name"`
@@ -65,7 +66,7 @@ func NormalizeGitHubURL(rawurl string) (*url.URL, error) {
 
 	// Either the first part of the path or the host must be github
 	if !(parsed.Host == `www.github.com` || parsed.Host == `github.com` || strings.HasPrefix(parsed.Path, `www.github.com`) || strings.HasPrefix(parsed.Path, `github.com`)) {
-		return nil, fmt.Errorf("%s does not appear to be a GitHub URL", rawurl)
+		return nil, fmt.Errorf("%q does not appear to be a GitHub URL", rawurl)
 	}
 	// Normalize the host
 	parsed.Host = `github.com`
@@ -77,7 +78,7 @@ func NormalizeGitHubURL(rawurl string) (*url.URL, error) {
 	// There should be a blank part, a user, and a repo
 	parts := strings.Split(parsed.Path, "/")
 	if len(parts) < 3 {
-		return nil, fmt.Errorf("%s must point to a repository", rawurl)
+		return nil, fmt.Errorf("%q must point to a repository", rawurl)
 	}
 
 	// Remove any .git suffix from the repository part
@@ -99,7 +100,7 @@ func NormalizeGitHubURL(rawurl string) (*url.URL, error) {
 func NormalizeGitHubSSH(rawssh string) (*url.URL, error) {
 	parts := strings.Split(rawssh[15:], "/")
 	if len(parts) < 2 {
-		return nil, fmt.Errorf("%s does not appear to be a repository", rawssh)
+		return nil, fmt.Errorf("%q does not appear to be a repository", rawssh)
 	}
 
 	var repo = parts[1]
